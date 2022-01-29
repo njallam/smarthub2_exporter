@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -49,25 +50,36 @@ func (collector *SmartHub2Collector) Fetch(path string) string {
 }
 
 func (collector *SmartHub2Collector) Collect(ch chan<- prometheus.Metric) {
-	body := collector.Fetch("nonAuth/wan_conn.xml")
-	volumeMatches := volumeRegex.FindStringSubmatch(body)
-	if len(volumeMatches) != 3 {
-		log.Fatal("Volume regex did not match")
-	}
-	rx, _ := strconv.Atoi(volumeMatches[1])
-	tx, _ := strconv.Atoi(volumeMatches[2])
-	ch <- prometheus.MustNewConstMetric(metrics["totalTraffic"], prometheus.CounterValue, float64(tx), "upload")
-	ch <- prometheus.MustNewConstMetric(metrics["totalTraffic"], prometheus.CounterValue, float64(rx), "download")
+	var wg sync.WaitGroup
+	wg.Add(2)
 
-	body = collector.Fetch("cgi/cgi_basicMyDevice.js")
-	matches := deviceVolumeRegex.FindAllStringSubmatch(body, -1)
-	for _, match := range matches {
-		mac := strings.ToLower(strings.Replace(match[1], "%3A", ":", -1))
-		tx, _ = strconv.Atoi(match[2])
-		rx, _ = strconv.Atoi(match[3])
-		ch <- prometheus.MustNewConstMetric(metrics["deviceTraffic"], prometheus.CounterValue, float64(tx), mac, "upload")
-		ch <- prometheus.MustNewConstMetric(metrics["deviceTraffic"], prometheus.CounterValue, float64(rx), mac, "download")
-	}
+	go func() {
+		body := collector.Fetch("nonAuth/wan_conn.xml")
+		volumeMatches := volumeRegex.FindStringSubmatch(body)
+		if len(volumeMatches) != 3 {
+			log.Fatal("Volume regex did not match")
+		}
+		rx, _ := strconv.Atoi(volumeMatches[1])
+		tx, _ := strconv.Atoi(volumeMatches[2])
+		ch <- prometheus.MustNewConstMetric(metrics["totalTraffic"], prometheus.CounterValue, float64(tx), "upload")
+		ch <- prometheus.MustNewConstMetric(metrics["totalTraffic"], prometheus.CounterValue, float64(rx), "download")
+		wg.Done()
+	}()
+
+	go func() {
+		body := collector.Fetch("cgi/cgi_basicMyDevice.js")
+		matches := deviceVolumeRegex.FindAllStringSubmatch(body, -1)
+		for _, match := range matches {
+			mac := strings.ToLower(strings.Replace(match[1], "%3A", ":", -1))
+			tx, _ := strconv.Atoi(match[2])
+			rx, _ := strconv.Atoi(match[3])
+			ch <- prometheus.MustNewConstMetric(metrics["deviceTraffic"], prometheus.CounterValue, float64(tx), mac, "upload")
+			ch <- prometheus.MustNewConstMetric(metrics["deviceTraffic"], prometheus.CounterValue, float64(rx), mac, "download")
+		}
+		wg.Done()
+	}()
+
+	wg.Wait()
 }
 
 func (collector *SmartHub2Collector) Describe(ch chan<- *prometheus.Desc) {

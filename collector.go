@@ -36,7 +36,12 @@ func newSmartHub2Collector(ip string) *SmartHub2Collector {
 }
 
 func (collector *SmartHub2Collector) Fetch(path string) string {
-	response, err := collector.client.Get(collector.baseURL + "/" + path)
+	request, err := http.NewRequest("GET", collector.baseURL+"/"+path, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	request.Header.Add("Referer", collector.baseURL+"/basic_-_my_devices.htm")
+	response, err := collector.client.Do(request)
 	if err != nil {
 		log.Fatal(err)
 	}

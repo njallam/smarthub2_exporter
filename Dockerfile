@@ -7,5 +7,5 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -ldflags="-s -w" -o /go/bin/smarthub2_e
 
 FROM scratch
 COPY --from=builder /go/bin/smarthub2_exporter /go/bin/smarthub2_exporter
-EXPOSE 9917
+EXPOSE 9906
 ENTRYPOINT ["/go/bin/smarthub2_exporter"]

@@ -1,7 +1,7 @@
 package main
 
 import (
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"regexp"
@@ -46,7 +46,7 @@ func (collector *SmartHub2Collector) Fetch(path string) string {
 		log.Fatal(err)
 	}
 	defer response.Body.Close()
-	data, err := ioutil.ReadAll(response.Body)
+	data, err := io.ReadAll(response.Body)
 	if err != nil {
 		log.Fatal(err)
 	}
